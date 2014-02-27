@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+     KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+-->
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="format-detection" content="telephone=no" />
+        <!-- WARNING: for iOS 7, remove the width=device-width and height=device-height attributes. See https://issues.apache.org/jira/browse/CB-4323 -->
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
+        <link rel="stylesheet" type="text/css" href="css/index.css" />
+        <script src="js/jquery-1.11.0.js"></script>   
+        <script src="js/crypto_AES.js"></script>
+	    <title>miDOT</title>
+        <script type="text/javascript">
+            document.addEventListener("deviceready", onDeviceReady, false);
+
+            // Wait for phonegap to load
+            //
+            function onDeviceReady() {
+                               
+            }
+        </script>
+    </head>
+    <body>
+        <div id="main" style="margin: 100px; font-size: 24px;">
+            <form id="form1">
+                Username: <input type="text" name="username" style="height: 50px; margin-top: 10px;"><br>
+                Password: <input type="password" name="pwd" style="height: 50px; margin-top: 10px;"><br>
+                <input type="radio" name="sex" value="male" style="height: 50px; margin-top: 10px;">Male<br>
+                <input type="radio" name="sex" value="female" style="height: 50px; margin-top: 10px;">Female<br> 
+            </form>
+            <button id="button" onclick="insert()" style="width: 100px; height: 50px;">Insert</button>
+
+            <p id="Crypto_Encrypted"></p>
+            <p id="Crypto_Decrypted"></p><br> 
+            <a href="#" onclick="goCamera()" style="margin-left: 100px; font-size: 20px;">Go to camera</a>
+        </div>
+        <script type ="text/javascript">
+            var db = window.openDatabase("Database", "1.0", "miDOT Database", 200000);
+            var salt = ""
+            var iv = "";
+
+            function insert() {           
+                db.transaction(populateDB, errorCB, successCB);
+            }
+
+            // Populate the database 
+            //
+            function populateDB(tx) {
+                
+                var user = form1.username.value;
+                var password = form1.pwd.value;
+                var sex = $('input[name="sex"]:checked').val();
+                
+                // Do password encryption
+                var crypto_secured_pwd = cryptoEncrypt(password);
+                
+                tx.executeSql('DROP TABLE IF EXISTS LOGIN');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS LOGIN(username unique, crypto_password, sex)');
+                tx.executeSql('INSERT INTO LOGIN (username, crypto_password, sex) VALUES (?, ?, ?)', [user, crypto_secured_pwd, sex]);
+            }
+
+            // Transaction error callback
+            //
+            function errorCB(err) {
+                console.log("Error processing SQL: "+err.code);
+            }
+
+            // Transaction success callback
+            //
+            function successCB() {
+                db.transaction(queryDB, errorCB);
+            }
+
+            // Query the database
+            //
+            function queryDB(tx) {
+                tx.executeSql('SELECT * FROM LOGIN', [], querySuccess, errorCB);
+            }
+
+            function querySuccess(tx, results) {
+                var len = results.rows.length;
+
+                for (var i = 0; i < len; i++) {
+                    // Crypto encrypt output
+                    Crypto_Encrypted.innerHTML = "<b>Encrypted using Crypto library:</b> <br><br>" + "Username: " + results.rows.item(i).username + ", Password = " + results.rows.item(i).crypto_password + ", Sex = " + results.rows.item(i).sex;
+
+                    // Crypto decrypt output
+                    var crypto_decrypted_key = cryptoDecrypt(results.rows.item(i).crypto_password);
+                    Crypto_Decrypted.innerHTML = "<b>Decrypted using Crypto library:</b> " + crypto_decrypted_key;
+                }
+            }
+
+            /**
+            * use crypto.js library to encrypt key.
+            */
+            function cryptoEncrypt(key) {
+                //salt = CryptoJS.lib.WordArray.random(16);
+                //iv = CryptoJS.lib.WordArray.random(16);
+                salt = getSalt();
+                iv = getIV();
+                var crypto_secured_key = CryptoJS.AES.encrypt(key, salt, { iv: iv });   
+                return crypto_secured_key;            
+            }
+
+            /**
+            * use crypto.js library to decrypt key.
+            */
+            function cryptoDecrypt(encrypted_key) {
+                var crypto_decrypted_key = CryptoJS.AES.decrypt(encrypted_key, salt, { iv: iv });
+                return crypto_decrypted_key.toString(CryptoJS.enc.Utf8);
+            }
+
+            function goCamera() {
+                window.location = "camera.html";
+            }
+
+            function getSalt() {
+                var salt = window.MainActivity.getEncryptedSalt();
+                return salt;
+            }
+
+            function getIV() {
+                var iv = window.MainActivity.getEncryptedIV();
+                return iv;
+            }
+
+        </script>
+        <script type="text/javascript" src="js/index.js"></script>
+    </body>
+</html>
